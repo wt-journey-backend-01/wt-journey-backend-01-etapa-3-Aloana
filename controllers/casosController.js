@@ -4,7 +4,7 @@ const { AppError } = require("../utils/errorHandler");
 
 function validateId(id) {
   if (isNaN(Number(id)) || Number(id) <= 0) {
-    throw new AppError("ID inválido", 400);
+    throw new AppError("ID inválido", 404);
   }
 }
 
