@@ -1,7 +1,7 @@
-const db = require('../db');
+const db = require('../db/db');
 
 async function findAll() {
-    return db.agentes.select('*');
+    return db('agentes').select('*');
 }
 
 async function findById(id) {
@@ -13,9 +13,12 @@ async function add(agente) {
   return createdAgente;
 }
 
-async function update(id, agenteAtualizado) {
-    const [agenteAtualizado] = await db('agentes').where({ id }).update(agenteAtualizado).returning('*');
-  return agenteAtualizado;
+async function update(id, dadosAtualizados) {
+  const [agente] = await db('agentes')
+    .where({ id })
+    .update(dadosAtualizados)
+    .returning('*');
+  return agente;
 }
 
 function remove(id) {

@@ -5,7 +5,7 @@ const agentes = agentesRepository.findAll();
 
 
 async function findAll() {
-    return db('casos').select();
+    return db('casos').select('*');
 }
 
 async function findById(id) {
