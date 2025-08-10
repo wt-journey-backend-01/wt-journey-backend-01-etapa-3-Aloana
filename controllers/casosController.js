@@ -11,38 +11,7 @@ function validateId(id) {
 
 async function getAllCasos(req, res, next) {
   try {
-    let casos = await casosRepository.findAll();
-    const { status, agente_id, sortBy, order, keyword } = req.query;
-
-    if (status) {
-      casos = casos.filter(c => c.status?.toLowerCase() === status.toLowerCase());
-    }
-    if (agente_id) {
-      casos = casos.filter(c => Number(c.agente_id) === Number(agente_id));
-    }
-    if (keyword) {
-      const kw = keyword.toLowerCase();
-      casos = casos.filter(c =>
-        (c.titulo && c.titulo.toLowerCase().includes(kw)) ||
-        (c.descricao && c.descricao.toLowerCase().includes(kw))
-      );
-    }
-    if (sortBy) {
-      const orderDirection = order === 'desc' ? -1 : 1;
-      casos.sort((a, b) => {
-        if (['dataDeAbertura', 'dataDeFechamento'].includes(sortBy)) {
-          const dateA = moment(a[sortBy], 'YYYY-MM-DD');
-          const dateB = moment(b[sortBy], 'YYYY-MM-DD');
-          if (!dateA.isValid() || !dateB.isValid()) return 0;
-          return dateA.isBefore(dateB) ? -1 * orderDirection : 1 * orderDirection;
-        }
-        if (!a[sortBy] || !b[sortBy]) return 0;
-        if (typeof a[sortBy] === 'string') return a[sortBy].localeCompare(b[sortBy]) * orderDirection;
-        if (typeof a[sortBy] === 'number') return (a[sortBy] - b[sortBy]) * orderDirection;
-        return 0;
-      });
-    }
-
+    let casos = await casosRepository.findFiltered(req.query);
     res.json(casos);
   } catch (error) {
     next(error);
@@ -65,8 +34,11 @@ async function getCasoById(req, res, next) {
 
 async function createCaso(req, res, next) {
   try {
-    const { titulo, descricao, status, agente_id } = req.body;
+    const { id, titulo, descricao, status, agente_id } = req.body;
     const statusValidos = ["aberto", "solucionado"];
+
+    if ('id' in req.body)
+      throw new AppError("Não é permitido fornecer o campo 'id' ao criar caso", 400);
 
     if (!titulo || !descricao || !status || !agente_id)
       throw new AppError("Dados do caso incompletos", 400);
@@ -97,29 +69,27 @@ async function updateCaso(req, res, next) {
     const id = req.params.id;
     validateId(id);
 
-    const { titulo, descricao, status, agente_id } = req.body;
+    if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body) || Object.keys(req.body).length === 0)
+      throw new AppError("Payload inválido", 400);
+
+    const { id: ignored, ...dados } = req.body;
     const statusValidos = ["aberto", "solucionado"];
 
-    if (!titulo || !descricao || !status || !agente_id)
+    if (!dados.titulo || !dados.descricao || !dados.status || !dados.agente_id)
       throw new AppError("Dados do caso incompletos", 400);
 
-    if (!statusValidos.includes(status.toLowerCase()))
+    if (!statusValidos.includes(dados.status.toLowerCase()))
       throw new AppError("Status inválido", 400);
 
-    validateId(agente_id);
+    validateId(dados.agente_id);
 
-    const agenteExiste = await agentesRepository.findById(agente_id);
+    const agenteExiste = await agentesRepository.findById(dados.agente_id);
     if (!agenteExiste) throw new AppError("Agente responsável não encontrado", 404);
 
     const casoExiste = await casosRepository.findById(id);
     if (!casoExiste) throw new AppError("Caso não encontrado", 404);
 
-    const result = await casosRepository.update(id, {
-      titulo,
-      descricao,
-      status: status.toLowerCase(),
-      agente_id
-    });
+    const result = await casosRepository.update(id, dados);
 
     res.json(result);
   } catch (error) {
@@ -133,8 +103,10 @@ async function partialUpdateCaso(req, res, next) {
     validateId(id);
 
     const updates = req.body;
-    if (!updates || typeof updates !== "object" || Array.isArray(updates))
+    if (!updates || typeof updates !== "object" || Array.isArray(updates) || Object.keys(updates).length === 0)
       throw new AppError("Payload inválido", 400);
+
+    if ('id' in updates) delete updates.id;
 
     if (updates.agente_id) {
       validateId(updates.agente_id);
@@ -146,7 +118,6 @@ async function partialUpdateCaso(req, res, next) {
     if (!caso) throw new AppError("Caso não encontrado", 404);
 
     const result = await casosRepository.update(id, { ...caso, ...updates });
-
     res.json(result);
   } catch (error) {
     next(error);

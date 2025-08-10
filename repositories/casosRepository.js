@@ -1,11 +1,23 @@
 const db = require('../db/db');
-const agentesRepository = require('./agentesRepository');
-
-const agentes = agentesRepository.findAll();
-
 
 async function findAll() {
-    return db('casos').select('*');
+  return db('casos').select('*');
+}
+
+async function findFiltered(queryParams) {
+  const { status, agente_id, sortBy, order, keyword } = queryParams;
+  const query = db('casos');
+
+  if (status) query.whereILike('status', status);
+  if (agente_id) query.where('agente_id', agente_id);
+  if (keyword) {
+    query.where(function() {
+      this.whereILike('titulo', `%${keyword}%`).orWhereILike('descricao', `%${keyword}%`);
+    });
+  }
+  if (sortBy) query.orderBy(sortBy, order === 'desc' ? 'desc' : 'asc');
+
+  return query.select('*');
 }
 
 async function findById(id) {
@@ -13,13 +25,17 @@ async function findById(id) {
 }
 
 async function add(caso) {
-    const [createdCaso] = await db('casos').insert(caso).returning('*');
-  return createdCaso;
+  const [novoCaso] = await db('casos').insert(caso).returning('*');
+  return novoCaso;
 }
 
-async function update(id, casoAtualizado) {
-  const [updatedCaso] = await db('casos').where({ id }).update(casoAtualizado).returning('*');
-  return updatedCaso;
+async function update(id, dados) {
+  delete dados.id; // Protege o id!
+  const [caso] = await db('casos')
+    .where({ id })
+    .update(dados)
+    .returning('*');
+  return caso;
 }
 
 async function remove(id) {
@@ -27,9 +43,10 @@ async function remove(id) {
 }
 
 module.exports = {
-    findAll,
-    findById,
-    add,
-    update,
-    remove
-}
+  findAll,
+  findFiltered,
+  findById,
+  add,
+  update,
+  remove,
+};
