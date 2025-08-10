@@ -1,7 +1,6 @@
 const casosRepository = require("../repositories/casosRepository");
 const agentesRepository = require("../repositories/agentesRepository");
 const { AppError } = require("../utils/errorHandler");
-const moment = require("moment");
 
 function validateId(id) {
   if (isNaN(Number(id)) || Number(id) <= 0) {
@@ -11,7 +10,7 @@ function validateId(id) {
 
 async function getAllCasos(req, res, next) {
   try {
-    let casos = await casosRepository.findFiltered(req.query);
+    const casos = await casosRepository.findFiltered(req.query);
     res.json(casos);
   } catch (error) {
     next(error);
@@ -51,13 +50,7 @@ async function createCaso(req, res, next) {
     const agenteExiste = await agentesRepository.findById(agente_id);
     if (!agenteExiste) throw new AppError("Agente responsável não encontrado", 404);
 
-    const createdCaso = await casosRepository.add({
-      titulo,
-      descricao,
-      status: status.toLowerCase(),
-      agente_id
-    });
-
+    const createdCaso = await casosRepository.add({ titulo, descricao, status: status.toLowerCase(), agente_id });
     res.status(201).json(createdCaso);
   } catch (error) {
     next(error);
@@ -69,28 +62,30 @@ async function updateCaso(req, res, next) {
     const id = req.params.id;
     validateId(id);
 
+    if ('id' in req.body)
+      throw new AppError("Não é permitido alterar o campo 'id'", 400);
+
     if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body) || Object.keys(req.body).length === 0)
       throw new AppError("Payload inválido", 400);
 
-    const { id: ignored, ...dados } = req.body;
+    const { titulo, descricao, status, agente_id } = req.body;
     const statusValidos = ["aberto", "solucionado"];
 
-    if (!dados.titulo || !dados.descricao || !dados.status || !dados.agente_id)
+    if (!titulo || !descricao || !status || !agente_id)
       throw new AppError("Dados do caso incompletos", 400);
 
-    if (!statusValidos.includes(dados.status.toLowerCase()))
+    if (!statusValidos.includes(status.toLowerCase()))
       throw new AppError("Status inválido", 400);
 
-    validateId(dados.agente_id);
+    validateId(agente_id);
 
-    const agenteExiste = await agentesRepository.findById(dados.agente_id);
+    const agenteExiste = await agentesRepository.findById(agente_id);
     if (!agenteExiste) throw new AppError("Agente responsável não encontrado", 404);
 
     const casoExiste = await casosRepository.findById(id);
     if (!casoExiste) throw new AppError("Caso não encontrado", 404);
 
-    const result = await casosRepository.update(id, dados);
-
+    const result = await casosRepository.update(id, { titulo, descricao, status: status.toLowerCase(), agente_id });
     res.json(result);
   } catch (error) {
     next(error);
@@ -103,19 +98,20 @@ async function partialUpdateCaso(req, res, next) {
     validateId(id);
 
     const updates = req.body;
+    if ('id' in updates)
+      throw new AppError("Não é permitido alterar o campo 'id'", 400);
+
     if (!updates || typeof updates !== "object" || Array.isArray(updates) || Object.keys(updates).length === 0)
       throw new AppError("Payload inválido", 400);
 
-    if ('id' in updates) delete updates.id;
+    const caso = await casosRepository.findById(id);
+    if (!caso) throw new AppError("Caso não encontrado", 404);
 
     if (updates.agente_id) {
       validateId(updates.agente_id);
       const agenteExiste = await agentesRepository.findById(updates.agente_id);
       if (!agenteExiste) throw new AppError("Agente responsável não encontrado", 404);
     }
-
-    const caso = await casosRepository.findById(id);
-    if (!caso) throw new AppError("Caso não encontrado", 404);
 
     const result = await casosRepository.update(id, { ...caso, ...updates });
     res.json(result);

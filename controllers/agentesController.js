@@ -4,13 +4,13 @@ const agentesRepository = require('../repositories/agentesRepository');
 
 function validateId(id) {
   if (isNaN(Number(id)) || Number(id) <= 0) {
-    throw new AppError('ID inválido', 400);
+    throw new AppError("ID inválido", 400);
   }
 }
 
 async function getAllAgentes(req, res, next) {
   try {
-    let agentes = await agentesRepository.findFiltered(req.query);
+    const agentes = await agentesRepository.findFiltered(req.query);
     res.json(agentes);
   } catch (error) {
     next(error);
@@ -24,6 +24,7 @@ async function getAgenteById(req, res, next) {
 
     const agente = await agentesRepository.findById(id);
     if (!agente) throw new AppError("Agente não encontrado", 404);
+
     res.json(agente);
   } catch (error) {
     next(error);
@@ -34,22 +35,17 @@ async function createAgente(req, res, next) {
   try {
     const { id, nome, dataDeIncorporacao, cargo } = req.body;
 
-    if (!nome || !dataDeIncorporacao || !cargo)
-      throw new AppError("Dados do agente incompletos", 400);
-
     if ('id' in req.body)
       throw new AppError("Não é permitido fornecer o campo 'id' ao criar agente", 400);
+
+    if (!nome || !dataDeIncorporacao || !cargo)
+      throw new AppError("Dados do agente incompletos", 400);
 
     const dataIncorporacao = moment(dataDeIncorporacao, 'YYYY-MM-DD', true);
     if (!dataIncorporacao.isValid() || dataIncorporacao.isAfter(moment(), 'day'))
       throw new AppError("Data de incorporação inválida ou futura", 400);
 
-    const createdAgente = await agentesRepository.add({
-      nome,
-      dataDeIncorporacao,
-      cargo
-    });
-
+    const createdAgente = await agentesRepository.add({ nome, dataDeIncorporacao, cargo });
     res.status(201).json(createdAgente);
   } catch (error) {
     next(error);
@@ -61,23 +57,25 @@ async function updateAgente(req, res, next) {
     const id = req.params.id;
     validateId(id);
 
+    if ('id' in req.body)
+      throw new AppError("Não é permitido alterar o campo 'id'", 400);
+
     if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body) || Object.keys(req.body).length === 0)
       throw new AppError("Payload inválido", 400);
 
-    const { id: ignored, ...dados } = req.body;
+    const { nome, dataDeIncorporacao, cargo } = req.body;
 
-    if (!dados.nome || !dados.dataDeIncorporacao || !dados.cargo)
+    if (!nome || !dataDeIncorporacao || !cargo)
       throw new AppError("Dados do agente incompletos", 400);
 
     const agenteExiste = await agentesRepository.findById(id);
     if (!agenteExiste) throw new AppError("Agente não encontrado", 404);
 
-    const dataIncorporacao = moment(dados.dataDeIncorporacao, 'YYYY-MM-DD', true);
-    if (!dataIncorporacao.isValid() || dataIncorporacao.isAfter(moment(), 'day'))
+    const dataValidada = moment(dataDeIncorporacao, 'YYYY-MM-DD', true);
+    if (!dataValidada.isValid() || dataValidada.isAfter(moment(), 'day'))
       throw new AppError("Data de incorporação inválida ou futura", 400);
 
-    const result = await agentesRepository.update(id, dados);
-
+    const result = await agentesRepository.update(id, { nome, dataDeIncorporacao, cargo });
     res.json(result);
   } catch (error) {
     next(error);
@@ -90,28 +88,22 @@ async function partialUpdateAgente(req, res, next) {
     validateId(id);
 
     const updates = req.body;
+    if ('id' in updates)
+      throw new AppError("Não é permitido alterar o campo 'id'", 400);
+
     if (!updates || typeof updates !== 'object' || Array.isArray(updates) || Object.keys(updates).length === 0)
       throw new AppError("Payload inválido", 400);
 
-    if ('id' in updates) delete updates.id;
-
     if (updates.dataDeIncorporacao) {
-      const dataIncorporacao = moment(updates.dataDeIncorporacao, 'YYYY-MM-DD', true);
-      if (!dataIncorporacao.isValid() || dataIncorporacao.isAfter(moment(), 'day'))
+      const dataValidada = moment(updates.dataDeIncorporacao, 'YYYY-MM-DD', true);
+      if (!dataValidada.isValid() || dataValidada.isAfter(moment(), 'day'))
         throw new AppError("Data de incorporação inválida ou futura", 400);
     }
-
-    if (updates.nome !== undefined && !updates.nome)
-      throw new AppError("Nome inválido", 400);
-
-    if (updates.cargo !== undefined && !updates.cargo)
-      throw new AppError("Cargo inválido", 400);
 
     const agente = await agentesRepository.findById(id);
     if (!agente) throw new AppError("Agente não encontrado", 404);
 
     const result = await agentesRepository.update(id, { ...agente, ...updates });
-
     res.json(result);
   } catch (error) {
     next(error);
