@@ -25,8 +25,8 @@ async function findById(id) {
 }
 
 async function add(caso) {
-  const [novoCaso] = await db('casos').insert(caso).returning('*');
-  return novoCaso;
+  const result = await db('casos').insert(caso).returning('*');
+  return result[0];
 }
 
 async function update(id, dados) {

@@ -24,8 +24,8 @@ async function findById(id) {
 }
 
 async function add(agente) {
-  const [novoAgente] = await db('agentes').insert(agente).returning('*');
-  return novoAgente;
+  const result = await db('agentes').insert(agente).returning('*');
+  return result[0];
 }
 
 async function update(id, dados) {
